@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <config>
-    <server name="MiServidorBigBang" ip="127.0.0.1" puerto="5555"/>
-    <database path="./registered.txt" passwdpath="./passwords.txt"/>
+    <server name="MiServidorBigBang" ip="127.0.0.1" puerto="8687"/>
+    <database path="./registered.txt" passwdpath="./passwords"/>
     <log path="./log_pr.txt"/>
 </config>
