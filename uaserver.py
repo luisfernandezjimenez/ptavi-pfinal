@@ -46,8 +46,8 @@ class ProxyHandler(socketserver.DatagramRequestHandler):
                 self.wfile.write(bytes(respuesta, 'utf-8') + b'\r\n')
 
             elif metodo_cliente == "INVITE":
-                self.RTP["IP"] = linea_cliente.decode('utf-8').split(' ')[7]
-                self.RTP["PORT"] = linea_cliente.decode('utf-8').split(' ')[8]
+                self.RTP["IP"] = linea_cliente.decode('utf-8').split(' ')[6]
+                self.RTP["PORT"] = linea_cliente.decode('utf-8').split(' ')[7]
 
                 if Thread(target=rtp, args=(self.RTP["IP"], self.RTP["PORT"],
                           PATH_AUDIO,)).isAlive():
