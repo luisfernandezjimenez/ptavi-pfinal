@@ -82,7 +82,7 @@ class ProxyHandler(socketserver.DatagramRequestHandler):
                 time.sleep(0.2)
                 hilo2.start()
                 hilo1.join()
-                hilo2..join()
+                hilo2.join()
 
             elif metodo_cliente == 'BYE':
                 respuesta = "SIP/2.0 200 OK\r\n"
