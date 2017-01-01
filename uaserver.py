@@ -81,9 +81,8 @@ class ProxyHandler(socketserver.DatagramRequestHandler):
                 hilo1.start()
                 time.sleep(0.2)
                 hilo2.start()
-                hilo1.join()
                 hilo2.join()
-
+                print("SIP/2.0 480 Temporarily Unavailable\r\n")
             elif metodo_cliente == 'BYE':
                 respuesta = "SIP/2.0 200 OK\r\n"
                 print("Codigo respuesta a BYE: \r\n", respuesta)
