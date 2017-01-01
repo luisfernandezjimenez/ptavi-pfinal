@@ -7,6 +7,7 @@ import socket
 import hashlib
 import os
 import time
+from threading import Thread
 
 
 def hora_actual():
@@ -34,6 +35,24 @@ def fichero_log(fichero, evento, ip, puerto, texto):
         fichero.write(" Finishing. \r\n")
 
     fichero.close()
+
+
+def cvlc(IP_RTP, PUERTO_RTP):
+    """Se definde cvlc."""
+    aEjecutarVLC = 'cvlc rtp://@' + IP_RTP + ':'
+    aEjecutarVLC += PUERTO_RTP + ' 2> /dev/null &'
+    print("Vamos a ejecutar", aEjecutarVLC)
+    os.system(aEjecutarVLC)
+
+
+def rtp(IP_RTP, PUERTO_RTP, PATH_AUDIO):
+    """Se define rtp."""
+    aEjecutar = ('./mp32rtp -i ' + IP_RTP + ' -p ' +
+                 PUERTO_RTP + ' < ' +
+                 PATH_AUDIO.split('./')[1])
+    print("Vamos a ejecutar", aEjecutar)
+    os.system(aEjecutar)
+    print('Envío de audio finalizado.')
 
 if __name__ == "__main__":
     try:
@@ -97,21 +116,21 @@ if __name__ == "__main__":
         # Añadimos cabeceras
         LINEA = METODO + " sip:" + OPCION + " SIP/2.0\r\n"
         LINEA += "Content-Type: application/sdp\r\n\r\n"
-        LINEA += "v=0\r\n" + "o=" + USERNAME + " " + IP + " \r\n"
+        LINEA += "v=0\r\n" + "o=" + USERNAME + " " + IP + "\r\n"
         LINEA += "s=misesion" + "\r\n" + "t=0" + "\r\n"
         LINEA += "m=audio " + PUERTO_RTP + " RTP" + "\r\n"
     elif METODO == 'BYE':
         # BYE sip:receptor SIP/2.0
         LINEA = METODO + " sip:" + OPCION + " SIP/2.0\r\n"
     else:
-        LINEA = METODO + " sip:" + OPCION + " SIP/2.0\r\n"
+        LINEA = METODO
 
     # Enviamos la petición
     print("Enviando: \r\n" + LINEA)
     my_socket.send(bytes(LINEA, 'utf-8') + b'\r\n')
     # Lo escribimos en archivo log
-    lista = LINEA.split('\r\n')
-    texto = " ".join(lista)
+    data = LINEA.split('\r\n')
+    texto = " ".join(data)
     fichero_log(PATH_LOG, "sent_to", IP_PROXY, PUERTO_PROXY, texto)
 
     # Recibimos respuesta
@@ -128,23 +147,26 @@ if __name__ == "__main__":
     data = data.decode('utf-8').split("\r\n")
     texto = " ".join(data)
     fichero_log(PATH_LOG, "received", IP_PROXY, PUERTO_PROXY, texto)
+    hilos = {'hilo1': Thread(), 'hilo2': Thread()}
 
     if data[0] == "SIP/2.0 401 Unauthorized":
         # Añadimos cabecera autenticación (FUNCION HASH)
         m = hashlib.md5()
         nonce = data[1].split("=")[-1]
+        nonce = nonce.split('"')[1]
         m.update(bytes(PASSWORD, 'utf-8'))
         m.update(bytes(nonce, 'utf-8'))
-        LINEA += "Authorization: Digest response=" + m.hexdigest() + "\r\n"
+        LINEA += "Authorization: Digest response=" + '"' + m.hexdigest()
+        LINEA += '"' + "\r\n"
         print("Enviando: \r\n" + LINEA)
         my_socket.send(bytes(LINEA, 'utf-8') + b'\r\n')
-        lista = LINEA.split('\r\n')
-        texto = " ".join(lista)
+        data = LINEA.split('\r\n')
+        texto = " ".join(data)
         fichero_log(PATH_LOG, "sent_to", IP_PROXY, PUERTO_PROXY, texto)
         data = my_socket.recv(1024)
         print("Recibido: \r\n", data.decode('utf-8'))
-        lista = data.decode('utf-8').split('\r\n')
-        texto = " ".join(lista)
+        data = data.decode('utf-8').split('\r\n')
+        texto = " ".join(data)
         fichero_log(PATH_LOG, "received", IP_PROXY, PUERTO_PROXY, texto)
     elif data[0] == "SIP/2.0 100 Trying":
         # Metodo de asentimiento. ACK sip:receptor SIP/2.0
@@ -156,15 +178,21 @@ if __name__ == "__main__":
         texto = " ".join(lista)
         fichero_log(PATH_LOG, "sent_to", IP_PROXY, PUERTO_PROXY, texto)
 
-        # Envio RTP
+        # Envio RTP con Hilos
         # aEjecutar es un string con lo que se ha de ejecutar en la shell
-        IP_RTP = data[9].split(' ')[-2]
+        IP_RTP = data[9].split(' ')[-1]
         PUERTO_RTP = data[12].split(' ')[-2]
-        aEjecutar = "./mp32rtp -i " + IP_RTP + " -p " + PUERTO_RTP
-        aEjecutar += " < " + PATH_AUDIO.split('./')[1]
-        print("Vamos a ejecutar", aEjecutar)
-        os.system(aEjecutar)
+        # VLC con Hilos
+        hilos['hilo1'] = Thread(target=cvlc, args=(IP_RTP, PUERTO_RTP,))
+        hilos['hilo2'] = Thread(target=rtp, args=(IP_RTP, PUERTO_RTP,
+                                PATH_AUDIO,))
+        hilos['hilo1'].start()
+        time.sleep(0.2)
+        hilos['hilo2'].start()
     elif data[0] == "SIP/2.0 200 OK":
+        # Paramos envío RTP y VLC
+        os.system('killall mp32rtp 2> /dev/null')
+        os.system('killall vlc 2> /dev/null')
         # Terminamos de escribir en el fichero log --> Finishing
         fichero_log(PATH_LOG, "finishing", IP, PUERTO, "")
         print("Terminando socket...")
