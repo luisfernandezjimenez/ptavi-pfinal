@@ -51,7 +51,7 @@ class ProxyHandler(socketserver.DatagramRequestHandler):
                 self.RTP["PORT"] = linea_cliente.decode('utf-8').split(' ')[7]
 
                 if Thread(target=rtp, args=(self.RTP["IP"], self.RTP["PORT"],
-                          PATH_AUDIO,)).isAlive() == True:
+                          PATH_AUDIO,)).isAlive():
                     # Recibimos INVITE mientras envío RTP
                     respuesta = "SIP/2.0 480 Temporarily Unavailable\r\n"
                 else:
