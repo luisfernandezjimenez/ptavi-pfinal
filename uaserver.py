@@ -51,7 +51,7 @@ class ProxyHandler(socketserver.DatagramRequestHandler):
                 self.RTP["PORT"] = linea_cliente.decode('utf-8').split(' ')[7]
 
                 if Thread(target=rtp, args=(self.RTP["IP"], self.RTP["PORT"],
-                          PATH_AUDIO,)).is_alive():
+                          PATH_AUDIO,)).isAlive():
                     # Recibimos INVITE mientras envío RTP
                     respuesta = "SIP/2.0 480 Temporarily Unavailable\r\n"
                 else:
@@ -82,7 +82,7 @@ class ProxyHandler(socketserver.DatagramRequestHandler):
                 time.sleep(0.2)
                 hilo2.start()
                 hilo2.join()
-                print("SIP/2.0 480 Temporarily Unavailable\r\n")
+
             elif metodo_cliente == 'BYE':
                 respuesta = "SIP/2.0 200 OK\r\n"
                 print("Codigo respuesta a BYE: \r\n", respuesta)
