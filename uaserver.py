@@ -47,6 +47,7 @@ class ProxyHandler(socketserver.DatagramRequestHandler):
 
             elif metodo_cliente == "INVITE":
                 self.RTP["IP"] = linea_cliente.decode('utf-8').split(' ')[6]
+                self.RTP["IP"] = self.RTP["IP"].split('\r\n')[0]
                 self.RTP["PORT"] = linea_cliente.decode('utf-8').split(' ')[7]
 
                 if Thread(target=rtp, args=(self.RTP["IP"], self.RTP["PORT"],
