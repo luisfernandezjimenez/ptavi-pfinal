@@ -9,6 +9,9 @@ import socket
 import time
 from uaclient import hora_actual
 from uaclient import fichero_log
+from uaclient import cvlc
+from uaclient import rtp
+from threading import Thread
 
 
 class ProxyHandler(socketserver.DatagramRequestHandler):
@@ -39,49 +42,63 @@ class ProxyHandler(socketserver.DatagramRequestHandler):
             print("El cliente nos manda: \r\n" + linea_cliente.decode('utf-8'))
 
             if metodo_cliente not in metodos_posibles:
-                respuesta = ("SIP/2.0 405 Method Not Allowed" + '\r\n\r\n')
-                self.wfile.write(bytes(respuesta, 'utf-8'))
+                respuesta = ("SIP/2.0 405 Method Not Allowed" + '\r\n')
+                self.wfile.write(bytes(respuesta, 'utf-8') + b'\r\n')
 
             elif metodo_cliente == "INVITE":
-                self.RTP["IP"] = linea_cliente.decode('utf-8').split(' ')[4]
-                self.RTP["PORT"] = linea_cliente.decode('utf-8').split(' ')[6]
-                # Mandamos código respuesta
-                respuesta = ("SIP/2.0 100 Trying" + '\r\n\r\n' +
-                             "SIP/2.0 180 Ringing" + '\r\n\r\n' +
-                             "SIP/2.0 200 OK" + '\r\n\r\n')
-                respuesta += "Content-Type: application/sdp\r\n\r\n"
-                respuesta += "v=0\r\n" + "o=" + USERNAME + " " + IP + " \r\n"
-                respuesta += "s=misesion" + "\r\n" + "t=0" + "\r\n"
-                respuesta += "m=audio " + PUERTO_RTP + " RTP" + "\r\n"
+                self.RTP["IP"] = linea_cliente.decode('utf-8').split(' ')[6]
+                self.RTP["PORT"] = linea_cliente.decode('utf-8').split(' ')[8]
+
+                if Thread(target=rtp, args=(self.RTP["IP"], self.RTP["PORT"],
+                          PATH_AUDIO,)).isAlive():
+                    # Recibimos INVITE mientras envío RTP
+                    respuesta = "SIP/2.0 480 Temporarily Unavailable\r\n"
+                else:
+                    # Mandamos código respuesta
+                    respuesta = ("SIP/2.0 100 Trying" + '\r\n\r\n' +
+                                 "SIP/2.0 180 Ringing" + '\r\n\r\n' +
+                                 "SIP/2.0 200 OK" + '\r\n')
+                    respuesta += "Content-Type: application/sdp\r\n\r\n"
+                    respuesta += "v=0\r\n" + "o=" + USERNAME + " " + IP
+                    respuesta += "\r\ns=misesion" + "\r\n" + "t=0" + "\r\n"
+                    respuesta += "m=audio " + PUERTO_RTP + " RTP"
+
                 print("Codigo respuesta a INVITE:  \r\n", respuesta)
-                self.wfile.write(bytes(respuesta, 'utf-8'))
-                lista = respuesta.split('\r\n')
-                texto = " ".join(lista)
+                self.wfile.write(bytes(respuesta, 'utf-8') + b'\r\n')
+                data = respuesta.split('\r\n')
+                texto = " ".join(data)
                 fichero_log(PATH_LOG, "sent_to", IP_CLIENTE, PUERTO_CLIENTE,
                             texto)
 
             elif metodo_cliente == 'ACK':
                 # Mandamos RTP al UACLIENT
-                aEjecutar = ('./mp32rtp -i ' + self.RTP["IP"] + ' -p ' +
-                             self.RTP["PORT"] + ' < ' +
-                             PATH_AUDIO.split('./')[1])
-                print("Vamos a ejecutar", aEjecutar)
-                os.system(aEjecutar)
+                # VLC con Hilos
+                hilo1 = Thread(target=cvlc, args=(self.RTP["IP"],
+                               self.RTP["PORT"],))
+                hilo2 = Thread(target=rtp, args=(self.RTP["IP"],
+                               self.RTP["PORT"], PATH_AUDIO,))
+                hilo1.start()
+                time.sleep(0.2)
+                hilo2.start()
 
             elif metodo_cliente == 'BYE':
                 respuesta = "SIP/2.0 200 OK\r\n"
                 print("Codigo respuesta a BYE: \r\n", respuesta)
-                self.wfile.write(bytes(respuesta, 'utf-8'))
-                lista = respuesta.split('\r\n')
-                texto = " ".join(lista)
+                self.wfile.write(bytes(respuesta, 'utf-8') + b'\r\n')
+                data = respuesta.split('\r\n')
+                texto = " ".join(data)
                 fichero_log(PATH_LOG, "sent_to", IP_CLIENTE, PUERTO_CLIENTE,
                             texto)
                 fichero_log(PATH_LOG, "finishing", IP, PUERTO, "")
+                # Paramos envío RTP y VLC
+                os.system('killall mp32rtp 2> /dev/null')
+                os.system('killall vlc 2> /dev/null')
+
             else:
-                respuesta = ("SIP/2.0 400 Bad Request" + '\r\n\r\n')
-                self.wfile.write(bytes(respuesta, 'utf-8'))
-                lista = respuesta.split('\r\n')
-                texto = " ".join(lista)
+                respuesta = ("SIP/2.0 400 Bad Request" + '\r\n')
+                self.wfile.write(bytes(respuesta, 'utf-8') + b'\r\n')
+                data = respuesta.split('\r\n')
+                texto = " ".join(data)
                 fichero_log(PATH_LOG, "sent_to", IP_CLIENTE, PUERTO_CLIENTE,
                             texto)
 
