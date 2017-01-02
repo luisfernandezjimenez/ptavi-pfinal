@@ -74,10 +74,10 @@ class ProxyHandler(socketserver.DatagramRequestHandler):
             elif metodo_cliente == 'ACK':
                 # Mandamos RTP al UACLIENT
                 # VLC con Hilos
-                hilo1 = Thread(target=cvlc, args=(self.RTP["IP"],
-                               self.RTP["PORT"],))
-                hilo2 = Thread(target=rtp, args=(self.RTP["IP"],
+                hilo1 = Thread(target=rtp, args=(self.RTP["IP"],
                                self.RTP["PORT"], PATH_AUDIO,))
+                hilo2 = Thread(target=cvlc, args=(self.RTP["IP"],
+                               self.RTP["PORT"],))
                 hilo1.start()
                 time.sleep(0.2)
                 hilo2.start()
