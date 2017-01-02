@@ -237,7 +237,6 @@ class ProxyHandler(socketserver.DatagramRequestHandler):
                             IP_CLIENTE, PUERTO_CLIENTE, texto)
                 fichero_log(PATH_LOGSERVER, "finishing", IP_CLIENTE,
                             PUERTO_CLIENTE, "")
-
             else:
                 respuesta = ("SIP/2.0 400 Bad Request" + '\r\n\r\n')
                 print("Enviando: \r\n" + respuesta)
