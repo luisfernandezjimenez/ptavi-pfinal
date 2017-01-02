@@ -183,9 +183,10 @@ if __name__ == "__main__":
         IP_RTP = data[9].split(' ')[-1]
         PUERTO_RTP = data[12].split(' ')[-2]
         # VLC con Hilos
-        hilos['hilo1'] = Thread(target=cvlc, args=(IP_RTP, PUERTO_RTP,))
-        hilos['hilo2'] = Thread(target=rtp, args=(IP_RTP, PUERTO_RTP,
+        hilos['hilo1'] = Thread(target=rtp, args=(IP_RTP, PUERTO_RTP,
                                 PATH_AUDIO,))
+        hilos['hilo2'] = Thread(target=cvlc, args=(IP_RTP, PUERTO_RTP,))
+
         hilos['hilo1'].start()
         time.sleep(0.2)
         hilos['hilo2'].start()
