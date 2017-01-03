@@ -5,6 +5,8 @@
 import sys
 import socketserver
 import socket
+import json
+import random
 import hashlib
 import csv
 import time
@@ -18,29 +20,26 @@ class ProxyHandler(socketserver.DatagramRequestHandler):
     # Diccionario con los Usuarios que estan registrados
     usuarios_registrados = {}
 
-    def register2file(self):
-        u"""Base de datos de usuarios registrados."""
-        fichero_registrados = open(PATH_DATABASE, 'w')
-        fichero_registrados.write("FICHERO DE TEXTO CON LOS USUARIOS ")
-        fichero_registrados.write("REGISTRADOS\r\n\r\n")
-        fichero_registrados.write("\tUser\t\t\t\tIP\t\t\tPuerto\t")
-        fichero_registrados.write("Fecha de Registro\tExpires\r\n")
+    def register2json(self):
+        """Se registra al cliente en un fichero json."""
+        with open('registered.json', 'w') as file:
+            json.dump(self.usuarios_registrados, file,
+                      sort_keys=True, indent=4)
 
-        for usuario in self.usuarios_registrados.keys():
-            IP = self.usuarios_registrados[usuario][0]
-            puerto = self.usuarios_registrados[usuario][1]
-            hora_actual = self.usuarios_registrados[usuario][2]
-            hora_exp = self.usuarios_registrados[usuario][3]
-            fichero_registrados.write(usuario + '\t' + IP + '\t' +
-                                      str(puerto) + '\t' + str(hora_actual) +
-                                      '\t' + str(hora_exp) + '\r\n')
+    def json2registered(self):
+        """Se mira si hay un fichero registered.json."""
+        try:
+            with open('registered.json', 'r') as fichero:
+                fichero_json = json.loads(fichero.read())
+                self.usuarios_registrados = fichero_json
+        except:
+            pass
 
     def handle(self):
         u"""Implementación de los Metodos INVITE, ACK y BYE."""
         # Escribe dirección y puerto del cliente (de tupla client_address)
         IP_CLIENTE = str(self.client_address[0])
         PUERTO_CLIENTE = self.client_address[1]
-        nonce = 898989898798989898989
         while 1:
             # Leyendo línea a línea lo que nos envía el cliente
             linea = self.rfile.read()
@@ -80,17 +79,19 @@ class ProxyHandler(socketserver.DatagramRequestHandler):
                                 IP_CLIENTE, puerto_cliente, texto)
 
                     if expires > 0:
+                        nonce = random.randint(0, 10**20)
+                        if direccion_sip in passwords_usuarios:
+                            passwords_usuarios[direccion_sip]['nonce'] = nonce
                         respuesta = ("SIP/2.0 401 Unauthorized" + "\r\n")
                         respuesta += "WWW-Authenticate: Digest nonce="
                         respuesta += '"' + str(nonce) + '"' + "\r\n"
-                        print("Enviando: \r\n" + respuesta)
 
                     elif expires == 0:
-                        # Borramos al usuario del diccionario
-                        del self.usuarios_registrados[direccion_sip]
-                        print("Borramos: ", direccion_sip)
+                        if direccion_sip in self.usuarios_registrados:
+                            # Borramos al usuario del diccionario
+                            del self.usuarios_registrados[direccion_sip]
+                            print("Borramos: ", direccion_sip)
                         respuesta = "SIP/2.0 200 OK" + "\r\n"
-                        print("Enviando: \r\n" + respuesta)
 
                 else:
                     # Comprobamos el response
@@ -100,35 +101,41 @@ class ProxyHandler(socketserver.DatagramRequestHandler):
                     fichero_log(PATH_LOGSERVER, "received",
                                 IP_CLIENTE, puerto_cliente, texto)
                     m = hashlib.md5()
-                    for usuario in passwords_usuarios.keys():
-                        if usuario == direccion_sip:
-                            password = passwords_usuarios[usuario]
-                    m.update(bytes(password, 'utf-8'))
-                    m.update(bytes(str(nonce), 'utf-8'))
+                    if direccion_sip in passwords_usuarios:
+                        m.update(bytes(passwords_usuarios
+                                 [direccion_sip]['password'], 'utf-8'))
+                        m.update(bytes(str(passwords_usuarios
+                                 [direccion_sip]['nonce']), 'utf-8'))
+                    with open('passwords.json', 'w') as file:
+                        json.dump(passwords_usuarios, file, sort_keys=True,
+                                  indent=4)
 
                     if m.hexdigest() == response:
                         respuesta = "SIP/2.0 200 OK\r\n"
-                        print("Enviamos :\r\n", respuesta)
                         hora_actual = time.time()
                         hora_exp = hora_actual + expires
-                        informacion = [IP_CLIENTE, puerto_cliente,
-                                       hora_actual, hora_exp]
-                        # Añadimos usuario al diccionario
+                        # Añadimos usuario al JSON
+                        informacion = {}
+                        informacion['Direccion'] = IP_CLIENTE
+                        informacion['Puerto'] = puerto_cliente
+                        informacion['Fecha de Registro'] = hora_actual
+                        informacion['Fecha de Expiracion'] = hora_exp
                         self.usuarios_registrados[direccion_sip] = informacion
 
                     else:
                         respuesta = "SIP/2.0 401 Unauthorized\r\n"
-                        respuesta += "WWW Authenticate: nonce=" + '"'
-                        respuesta += str(nonce) + '"' + "\r\n\r\n"
-                        print("Enviando: \r\n" + respuesta)
+                        respuesta += "WWW-Authenticate: nonce=" + '"'
+                        respuesta += str(random.randint(0, 10**20))
+                        respuesta += '"' + "\r\n\r\n"
 
+                print("Enviando: \r\n" + respuesta)
                 self.wfile.write(bytes(respuesta, 'utf-8') + b'\r\n')
                 data = respuesta.split('\r\n')
                 texto = " ".join(data)
                 fichero_log(PATH_LOGSERVER, "sent_to",
                             IP_CLIENTE, puerto_cliente, texto)
 
-                self.register2file()
+                self.register2json()
 
             elif metodo_cliente == "INVITE":
                 texto = " ".join(data)
@@ -138,8 +145,10 @@ class ProxyHandler(socketserver.DatagramRequestHandler):
                 destinatario = linea_troceada[1].split(':')[1]
                 if destinatario in self.usuarios_registrados:
                     print("Se lo mandamos a: ", destinatario)
-                    IP_DEST = self.usuarios_registrados[destinatario][0]
-                    PUERTO_DEST = self.usuarios_registrados[destinatario][1]
+                    IP_DEST = (self.usuarios_registrados
+                               [destinatario]['Direccion'])
+                    PUERTO_DEST = (self.usuarios_registrados
+                                   [destinatario]['Puerto'])
                     fichero_log(PATH_LOGSERVER, "sent_to",
                                 IP_DEST, PUERTO_DEST, texto)
                     # Creamos socket
@@ -179,8 +188,8 @@ class ProxyHandler(socketserver.DatagramRequestHandler):
                 fichero_log(PATH_LOGSERVER, "received",
                             IP_CLIENTE, PUERTO_CLIENTE, texto)
                 destinatario = linea_troceada[1].split(':')[1]
-                IP_DEST = self.usuarios_registrados[destinatario][0]
-                PUERTO_DEST = self.usuarios_registrados[destinatario][1]
+                IP_DEST = self.usuarios_registrados[destinatario]['Direccion']
+                PUERTO_DEST = self.usuarios_registrados[destinatario]['Puerto']
                 print("Se lo mandamos a: ", destinatario)
                 # Creamos socket (Lleva Cabecera Proxy)
                 my_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
@@ -199,8 +208,10 @@ class ProxyHandler(socketserver.DatagramRequestHandler):
                 print("Se lo mandamos a: ", destinatario)
 
                 if destinatario in self.usuarios_registrados:
-                    IP_DEST = self.usuarios_registrados[destinatario][0]
-                    PUERTO_DEST = self.usuarios_registrados[destinatario][1]
+                    IP_DEST = (self.usuarios_registrados
+                               [destinatario]['Direccion'])
+                    PUERTO_DEST = (self.usuarios_registrados
+                                   [destinatario]['Puerto'])
                     data.insert(1, cabecera_proxy)
                     texto = " ".join(data)
                     data = '\r\n'.join(data)
@@ -280,13 +291,11 @@ if __name__ == "__main__":
     log = linea_log[0].split("=")[1]
     PATH_LOGSERVER = log.split(" ")[0][1:-2]
 
-    # Coger del fichero PASSWORD.TXT las CONTRASEÑAS
-    with open(PASSWORDS_DATABASE, newline='') as password_fichero:
-        lineas = csv.reader(password_fichero)
+    # Coger el contenido del fichero PASSWORDS.JSON
+    with open('passwords.json', 'r') as fichero:
         passwords_usuarios = {}
-        for linea in lineas:
-            linea_usuario = linea[0].split(':')
-            passwords_usuarios[linea_usuario[0]] = linea_usuario[-1]
+        fichero = json.loads(fichero.read())
+        passwords_usuarios = fichero
 
     serv = socketserver.UDPServer((IP_SERVER, int(PUERTO_SERVER)),
                                   ProxyHandler)
