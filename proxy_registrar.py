@@ -38,6 +38,7 @@ class ProxyHandler(socketserver.DatagramRequestHandler):
     def handle(self):
         u"""Implementación de los Metodos INVITE, ACK y BYE."""
         # Escribe dirección y puerto del cliente (de tupla client_address)
+        self.json2registered()
         IP_CLIENTE = str(self.client_address[0])
         PUERTO_CLIENTE = self.client_address[1]
         while 1:
