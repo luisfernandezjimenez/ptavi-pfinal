@@ -1,0 +1,19 @@
+CABECERA PROXY:
+Para la cabecera proxy en el numero de branch he puesto uno fijo para todas 
+las cabeceras.
+
+Aparece cuando el Servidor Proxy reenvie el INVITE, ACK y BYE; además, 
+aparecerá antes del cabecera Content-Type en el 200 OK que responde al
+INVITE y, también, en el 200 OK que responde al BYE.
+
+INTEGRACIÓN DE (C)VLC:
+En la integración del vcl le he puesto un "&" para dejarlo en segundo plano
+y poder seguir interectuando con el terminal. 
+
+INTEGRACIÓN DE (C)VLC CON HILOS:
+Lo que hago es importar threading para poder utilizar los "hilos" y lo
+implemento al cvlc de la ampliación anterior,
+
+HILOS PARA EL ENVÍO DE AUDIO VÍA RTP:
+Utilizo las mims metodología de la anterior ampliación con el añadido de la
+excepción en el INVITE y la interrupción en el BYE (lo hago en el uaserver).
