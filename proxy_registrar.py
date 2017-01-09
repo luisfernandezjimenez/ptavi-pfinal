@@ -37,7 +37,7 @@ class ProxyHandler(socketserver.DatagramRequestHandler):
 
     def handle(self):
         u"""Implementación de los Metodos INVITE, ACK y BYE."""
-        self.json2registered() # Reestablecer Usuarios Conectados
+        self.json2registered()  # Reestablecer Usuarios Conectados
         # Escribe dirección y puerto del cliente (de tupla client_address)
         IP_CLIENTE = str(self.client_address[0])
         PUERTO_CLIENTE = self.client_address[1]
